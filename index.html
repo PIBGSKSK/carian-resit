@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Carian Resit PIBG SK Seri Kelebang</title>
+    <!-- Tailwind CSS for modern look -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PapaParse for easy CSV parsing (Google Sheets direct feed) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- html2pdf for high quality PDF downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        school: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            500: '#16a34a', // Emerald Green for SK Seri Kelebang Theme
+                            600: '#15803d',
+                            700: '#166534',
+                            800: '#14532d',
+                            900: '#114022',
+                        },
+                        accent: {
+                            gold: '#d97706',
+                            goldLight: '#fef3c7',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        /* Subtle pattern for realistic web background */
+        .receipt-watermark {
+            background-image: radial-gradient(rgba(22, 163, 74, 0.03) 2px, transparent 2px);
+            background-size: 24px 24px;
+        }
+        
+        /* Custom styles to force exact A4 dimensions on PDF export */
+        .pdf-page-container {
+            width: 800px;          /* Perfect visual layout width */
+            height: 1130px;        /* Strict A4 Aspect Ratio 1:1.414 */
+            background-color: #ffffff;
+            margin: 0 auto;
+            padding: 55px 65px;    /* Elegant spacing around elements */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Spreads out elements evenly to fill exactly 1 page */
+            position: relative;
+        }
+
+        /* Clean preview scroll wrapper for responsive screens */
+        .receipt-preview-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media print {
+            body {
+                background-color: #ffffff;
+                color: #000000;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-shadow-none {
+                box-shadow: none !important;
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between receipt-watermark text-slate-800 antialiased">
+
+    <!-- Header / Navbar -->
+    <header class="bg-gradient-to-r from-school-800 to-school-600 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">SK SERI KELEBANG</h1>
+                    <p class="text-xs sm:text-sm text-school-100 font-medium">Sistem Carian Resit Rasmi PIBG</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button onclick="openPasswordModal()" class="bg-school-750 hover:bg-school-800 bg-opacity-40 hover:bg-opacity-85 transition duration-200 px-4 py-2 rounded-lg text-sm font-semibold border border-school-500/30 flex items-center gap-2 shadow-sm">
+                    <i class="fas fa-lock text-accent-gold"></i>
+                    <span>Tetapan Admin</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-4xl">
+        
+        <!-- ========================================================================= -->
+        <!-- HALAMAN 1: VIEW CARIAN (DIPAPARKAN SECARA LALAI) -->
+        <!-- ========================================================================= -->
+        <div id="searchView" class="block transition-all duration-300">
+            <!-- Welcome & Search Section -->
+            <section class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 sm:p-10 text-center mb-8 relative overflow-hidden">
+                <!-- Decorative accents -->
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-school-500 via-accent-gold to-school-800"></div>
+                
+                <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-800 mb-3 tracking-tight uppercase">
+                    Sistem Carian Resit PIBG
+                </h2>
+                <p class="text-sm sm:text-base text-slate-500 max-w-xl mx-auto mb-8">
+                    Sila masukkan <strong class="text-school-700">Nombor Kad Pengenalan Murid</strong> untuk mencari, memapar, dan memuat turun resit pembayaran sumbangan PIBG anda secara digital.
+                </p>
+
+                <!-- Search Form -->
+                <form id="searchForm" onsubmit="handleSearch(event)" class="max-w-xl mx-auto">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="relative flex-grow">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-id-card text-slate-400 text-lg"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="icInput" 
+                                placeholder="Contoh: 120304-08-1122 atau 120304081122" 
+                                required
+                                class="block w-full pl-11 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:border-school-500 focus:ring focus:ring-school-200 focus:ring-opacity-50 text-slate-800 placeholder-slate-400 font-medium text-lg transition duration-200 shadow-inner"
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            class="bg-school-600 hover:bg-school-700 active:bg-school-800 text-white font-bold px-8 py-4 rounded-xl transition duration-200 shadow-md flex items-center justify-center gap-2 hover:shadow-lg text-lg min-w-[140px]"
+                        >
+                            <i class="fas fa-search"></i>
+                            <span>Cari</span>
+                        </button>
+                    </div>
+                    <div class="mt-3 flex justify-center items-center gap-2 text-xs text-slate-400">
+                        <i class="fas fa-shield-alt text-school-500"></i>
+                        <span>Maklumat dilindungi dengan selamat. Masukkan dengan atau tanpa sempang.</span>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Notification Area -->
+            <div id="alertContainer" class="hidden max-w-xl mx-auto mb-8">
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex gap-3 items-start">
+                    <i class="fas fa-exclamation-circle text-red-500 text-xl mt-0.5"></i>
+                    <div>
+                        <h4 class="font-bold text-red-800 text-sm">Carian Gagal</h4>
+                        <p id="alertMessage" class="text-xs text-red-700 mt-1">Rekod tidak ditemui. Sila pastikan Nombor Kad Pengenalan dimasukkan dengan betul.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connection Status Banner -->
+            <div id="statusBanner" class="max-w-xl mx-auto mb-8 hidden">
+                <div class="bg-emerald-50 border-l-4 border-emerald-500 p-3 rounded-r-xl shadow-xs flex justify-between items-center text-xs text-emerald-800">
+                    <span class="flex items-center gap-1.5 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Menghubung data Google Sheets secara Live.
+                    </span>
+                    <button onclick="resetToMockData()" class="text-slate-500 hover:text-red-600 font-semibold underline">Gunakan Data Demo</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ========================================================================= -->
+        <!-- HALAMAN 2: VIEW HASIL CARIAN / RESIT (DIPAPARKAN APABILA CARIAN JUMPA) -->
+        <!-- ========================================================================= -->
+        <div id="receiptView" class="hidden transition-all duration-300">
+            
+            <!-- Quick Actions Bar / Page Navigation -->
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mb-6 bg-white border border-slate-200 p-3 rounded-xl shadow-xs no-print">
+                <button 
+                    onclick="backToSearch()" 
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition w-full sm:w-auto justify-center"
+                >
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Kembali ke Carian</span>
+                </button>
+                
+                <div class="flex gap-2 w-full sm:w-auto justify-end">
+                    <button 
+                        onclick="printReceipt()" 
+                        class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 shadow-xs transition w-1/2 sm:w-auto justify-center"
+                    >
+                        <i class="fas fa-print text-slate-500"></i>
+                        <span>Cetak</span>
+                    </button>
+                    <button 
+                        onclick="downloadPDF()" 
+                        class="bg-school-600 hover:bg-school-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 shadow-xs transition hover:shadow-md w-1/2 sm:w-auto justify-center"
+                    >
+                        <i class="fas fa-file-pdf text-amber-300"></i>
+                        <span>Muat Turun PDF (A4)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scroll Wrapper to handle responsive view of the static A4 block on smaller screens -->
+            <div class="receipt-preview-scroll rounded-2xl shadow-2xl border border-slate-200 p-1 bg-white mb-6">
+                <!-- PDF Page Container (Ensures EXACT A4 dimensions) -->
+                <div class="pdf-page-container print-shadow-none" id="receiptContainer">
+                    
+                    <!-- Top Section: Header & Letterhead -->
+                    <div>
+                        <div class="flex items-start justify-between gap-6 pb-5">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">Resit Rasmi Pembayaran</h3>
+                                <h2 class="text-xl font-black text-slate-800 tracking-wide leading-tight uppercase">PERSATUAN IBU BAPA DAN GURU (PIBG)</h2>
+                                <p class="text-base font-extrabold text-school-600 tracking-wide uppercase">SEKOLAH KEBANGSAAN SERI KELEBANG</p>
+                                <p class="text-xs text-slate-500 font-medium mt-1">31200 Chemor, Perak Darul Ridzuan, Malaysia.</p>
+                            </div>
+                            
+                            <div class="text-right shrink-0">
+                                <span class="inline-block bg-school-600 text-white font-extrabold text-[10px] px-3.5 py-1.5 rounded-md mb-3 uppercase tracking-widest shadow-sm">SALINAN ASAL</span>
+                                <div class="text-xs text-slate-500 space-y-1">
+                                    <p class="font-medium">No. Resit: <span id="rNoResit" class="font-bold text-slate-900 text-sm tracking-wide">RE-000000</span></p>
+                                    <p class="font-medium">Tarikh Transaksi: <span id="rTarikh" class="font-bold text-slate-900">00/00/0000</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Professional Double Letterhead Line -->
+                        <div class="border-b-2 border-slate-800 w-full mb-0.5"></div>
+                        <div class="border-b border-slate-400 w-full mb-6"></div>
+
+                        <!-- Student Information Box -->
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 mb-6">
+                            <div class="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                                <div class="flex flex-col">
+                                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Nama Penuh Murid</span>
+                                    <span id="rNama" class="font-extrabold text-slate-800 uppercase tracking-wide text-sm">-</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Kelas / Tahun</span>
+                                    <span id="rKelas" class="font-extrabold text-slate-800 tracking-wide text-sm">-</span>
+                                </div>
+                                <div class="flex flex-col col-span-2 border-t border-slate-200/60 pt-3 mt-1">
+                                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">No. Kad Pengenalan Murid</span>
+                                    <span id="rNoKP" class="font-mono font-bold text-slate-700 text-sm tracking-wider">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Itemized Contributions Table -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 text-[11px] font-bold uppercase text-slate-600 tracking-wider border-b border-slate-200">
+                                        <th class="py-3 px-4 w-12 text-center">Bil</th>
+                                        <th class="py-3 px-4">Butiran / Keterangan Sumbangan</th>
+                                        <th class="py-3 px-4 text-center w-28">Status</th>
+                                        <th class="py-3 px-4 text-right w-36">Jumlah (RM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="receiptItemsTable" class="divide-y divide-slate-150 text-xs font-medium text-slate-700">
+                                    <!-- Dynamic rows loaded below -->
+                                </tbody>
+                                <tfoot>
+                                    <tr class="border-t-2 border-slate-300 bg-slate-50">
+                                        <td colspan="3" class="py-4 px-4 text-right font-extrabold text-slate-800 text-[12px] uppercase tracking-wider">Jumlah Keseluruhan Yang Dibayar :</td>
+                                        <td id="rJumlah" class="py-4 px-4 text-right font-black text-school-700 text-base tracking-wide border-l border-slate-200 bg-emerald-50/40">RM 0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Section: Declarations, Stamps & Signatures -->
+                    <div class="border-t border-dashed border-slate-200 pt-6">
+                        <div class="flex justify-between items-end gap-6">
+                            <!-- Left: Digital Seal & Validation Text -->
+                            <div class="flex items-center gap-4">
+                                <!-- Clean Digital Stamp Seal -->
+                                <div class="relative flex items-center justify-center w-20 h-20 border-2 border-school-600/35 rounded-full select-none transform -rotate-12 shrink-0">
+                                    <div class="absolute inset-1 border border-dashed border-school-600/40 rounded-full flex flex-col items-center justify-center text-[6px] font-black uppercase text-center text-school-600 tracking-tighter leading-none">
+                                        <span class="mb-0.5">PIBG SK</span>
+                                        <span class="text-[7px] font-black mb-0.5">SERI KELEBANG</span>
+                                        <span class="text-accent-gold font-bold text-[7px] border-y border-school-600/20 py-0.5 my-0.5 px-1.5">DITERIMA</span>
+                                        <span class="text-[5.5px]">SISTEM DIGITAL</span>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-500 max-w-sm space-y-1">
+                                    <p class="font-bold text-slate-700">Nota Penting:</p>
+                                    <p class="leading-relaxed">Sumbangan yang diterima membantu pelaksanaan agenda kebajikan murid. Resit ini dijana secara digital bagi mewakili Bendahari PIBG SK Seri Kelebang.</p>
+                                    <p class="text-[9px] text-slate-400">Tarikh Cetakan Dokumen: <span id="rTimestamp" class="font-medium text-slate-500">-</span></p>
+                                </div>
+                            </div>
+
+                            <!-- Right: Professional Signature Line -->
+                            <div class="text-center w-48 shrink-0">
+                                <p class="text-[10px] text-slate-400 mb-12">Diterima & disahkan oleh,</p>
+                                <div class="border-b border-slate-300 w-full mb-1"></div>
+                                <p class="text-[11px] font-bold text-slate-800 uppercase tracking-wide">Bendahari PIBG</p>
+                                <p class="text-[9px] text-slate-500">SK Seri Kelebang</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Admin Password Modal -->
+    <div id="passwordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300 opacity-0 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform scale-95 transition-transform duration-300">
+            <!-- Modal Header -->
+            <div class="bg-school-800 text-white px-6 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-shield-alt text-accent-gold"></i>
+                    <h3 class="font-bold text-lg">Akses Pentadbir (Admin)</h3>
+                </div>
+                <button onclick="closePasswordModal()" class="text-white/80 hover:text-white transition text-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Kata Laluan Tetapan Admin</label>
+                    <input 
+                        type="password" 
+                        id="adminPasswordInput" 
+                        placeholder="Masukkan kata laluan..."
+                        class="w-full border-2 border-slate-200 rounded-lg p-2.5 text-sm focus:border-school-500 focus:outline-none focus:ring-1 focus:ring-school-200"
+                        onkeydown="if(event.key === 'Enter') verifyAdminPassword()"
+                    />
+                </div>
+                <p id="passwordError" class="text-xs text-red-600 hidden font-semibold flex items-center gap-1">
+                    <i class="fas fa-times-circle"></i>
+                    <span>Kata laluan salah! Sila cuba lagi.</span>
+                </p>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closePasswordModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-4 py-2 rounded-lg text-xs transition">
+                    Batal
+                </button>
+                <button onclick="verifyAdminPassword()" class="bg-school-600 hover:bg-school-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-sm transition">
+                    Sahkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Sheets Integration / Configuration Modal -->
+    <div id="configModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300 opacity-0 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300">
+            <!-- Modal Header -->
+            <div class="bg-school-800 text-white px-6 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-database text-accent-gold"></i>
+                    <h3 class="font-bold text-lg">Penyambung Google Sheets</h3>
+                </div>
+                <button onclick="closeConfigModal()" class="text-white/80 hover:text-white transition text-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Sistem ini menyokong kemaskini data secara masa nyata (real-time) melalui integrasi terus ke Google Sheets anda.
+                </p>
+
+                <!-- Configuration Form -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Google Sheet CSV URL yang Diterbitkan</label>
+                    <textarea 
+                        id="sheetUrlInput" 
+                        rows="3" 
+                        placeholder="Sila tampal pautan Google Sheet CSV di sini..."
+                        class="w-full border-2 border-slate-200 rounded-lg p-2.5 text-xs font-mono focus:border-school-500 focus:outline-none focus:ring-1 focus:ring-school-200"
+                    ></textarea>
+                </div>
+
+                <!-- Mapping Status Area for Troubleshooting -->
+                <div id="mappingStatusArea" class="hidden bg-slate-50 rounded-xl p-4 border border-slate-200">
+                    <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <i class="fas fa-stethoscope text-school-600"></i>
+                        <span>Status Lajur Dikesan (Live Sheet)</span>
+                    </h4>
+                    <div id="mappingBadges" class="grid grid-cols-2 gap-2 text-[11px]">
+                        <!-- Badges dynamically updated -->
+                    </div>
+                </div>
+
+                <!-- Instruction Section (Malay) -->
+                <div class="bg-amber-50 rounded-xl p-4 border border-amber-100 text-xs text-amber-800 space-y-2">
+                    <h4 class="font-bold flex items-center gap-1.5">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Bagaimana cara menghubungkannya?</span>
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-1 text-amber-900/90 leading-normal pl-1">
+                        <li>Buka fail Google Sheet data resit anda.</li>
+                        <li>Klik <strong>Fail (File)</strong> &rarr; <strong>Kongsi (Share)</strong> &rarr; <strong>Terbitkan ke web (Publish to web)</strong>.</li>
+                        <li>Pilih tab <strong>Pautan (Link)</strong>, tukar "Seluruh Dokumen" kepada helaian resit anda, dan tukar "Halaman web" kepada <strong>Comma-separated values (.csv)</strong>.</li>
+                        <li>Klik <strong>Terbitkan (Publish)</strong>, salin pautan yang diberikan dan tampal di kotak atas.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-100">
+                <button onclick="resetSheetToDefault()" class="text-xs text-red-600 hover:text-red-700 font-semibold underline">
+                    Kembalikan Lalai
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="closeConfigModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-4 py-2 rounded-lg text-xs transition">
+                        Batal
+                    </button>
+                    <button onclick="saveConfig()" class="bg-school-600 hover:bg-school-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-sm transition">
+                        Simpan & Sambung
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple Interactive Toast Notification Area -->
+    <div id="toast" class="fixed bottom-4 right-4 z-50 transform translate-y-12 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm pointer-events-none no-print">
+        <i id="toastIcon" class="fas fa-check-circle text-school-500"></i>
+        <span id="toastMessage">Selesai!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 border-t border-slate-800 no-print">
+        <div class="container mx-auto px-4 space-y-2">
+            <p>&copy; 2026 PIBG SK Seri Kelebang. Hak Cipta Terpelihara.</p>
+            <p class="text-slate-600">Sistem ini dibina untuk kegunaan pengurusan dalaman sekolah dan memudahkan ibu bapa.</p>
+        </div>
+    </footer>
+
+    <!-- ========================================================================= -->
+    <!-- LOGIK JAVASCRIPT & INTEGRASI GOOGLE SHEETS -->
+    <!-- ========================================================================= -->
+    <script>
+        // =========================================================================
+        // PANDUAN UTAMA: TAMPAL PAUTAN GOOGLE SHEETS ANDA DI BAWAH SUPAYA KEKAL!
+        // =========================================================================
+        const DEFAULT_GOOGLE_SHEET_URL = ""; 
+
+        // Standard Default Mock Database for testing
+        const MOCK_DATABASE = [
+            {
+                "No. KP": "120304-08-1122",
+                "No Resit": "RES-2026-0043",
+                "Tarikh Transaksi": "15/03/2026",
+                "Nama Murid": "MUHAMMAD AMIRUL BIN ABDULLAH",
+                "Kelas": "4 IBNU SINA",
+                "Sumbangan PIBG": "50.00",
+                "Program Peningkatan": "30.00",
+                "Keselamatan & Keceriaan": "20.00",
+                "ICT dan Komputer": "15.00",
+                "Lain-lain": "10.00"
+            },
+            {
+                "No. KP": "110502-08-9876",
+                "No Resit": "RES-2026-0182",
+                "Tarikh Transaksi": "18/03/2026",
+                "Nama Murid": "NUR FARAHIAH BINTI ZAKARIA",
+                "Kelas": "5 AL-FARABI",
+                "Sumbangan PIBG": "50.00",
+                "Program Peningkatan": "30.00",
+                "Keselamatan & Keceriaan": "20.00",
+                "ICT dan Komputer": "15.00",
+                "Lain-lain": "0.00"
+            },
+            {
+                "No. KP": "151212-08-4433",
+                "No Resit": "RES-2026-0311",
+                "Tarikh Transaksi": "02/04/2026",
+                "Nama Murid": "AARON CHIA SENG WAN",
+                "Kelas": "1 AL-GHAZALI",
+                "Sumbangan PIBG": "50.00",
+                "Program Peningkatan": "0.00",
+                "Keselamatan & Keceriaan": "20.00",
+                "ICT dan Komputer": "15.00",
+                "Lain-lain": "5.00"
+            }
+        ];
+
+        let database = [...MOCK_DATABASE];
+        let googleSheetUrl = DEFAULT_GOOGLE_SHEET_URL;
+        const ADMIN_PASSWORD = "pibg123"; 
+
+        window.onload = function() {
+            loadSavedConfig();
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+            if(type === 'success') {
+                toastIcon.className = "fas fa-check-circle text-school-500 text-lg";
+            } else if (type === 'error') {
+                toastIcon.className = "fas fa-times-circle text-red-500 text-lg";
+            } else {
+                toastIcon.className = "fas fa-info-circle text-amber-500 text-lg";
+            }
+
+            toast.classList.remove('translate-y-12', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-12', 'opacity-0');
+            }, 4000);
+        }
+
+        function loadSavedConfig() {
+            const savedUrl = localStorage.getItem('pibg_sheet_url') || DEFAULT_GOOGLE_SHEET_URL;
+            if (savedUrl) {
+                googleSheetUrl = savedUrl;
+                document.getElementById('sheetUrlInput').value = savedUrl;
+                fetchGoogleSheetData(savedUrl);
+            }
+        }
+
+        function standardizeHeaders(row) {
+            let standardized = {};
+            const mappings = {
+                "No. KP": ["no kp", "nokp", "kp", "ic", "no ic", "noic", "kad pengenalan", "nokadpengenalan", "mykad", "nric"],
+                "Nama Murid": ["nama murid", "nama", "namapelajar", "nama penuh", "student name", "nama anak", "fullname"],
+                "No Resit": ["no resit", "noresit", "resit", "receipt no", "receiptno", "no rujukan", "no_resit"],
+                "Tarikh Transaksi": ["tarikh transaksi", "tarikh", "date", "tarikh bayaran", "tarikh_transaksi"],
+                "Kelas": ["kelas", "tahun", "class", "tingkatan"],
+                "Sumbangan PIBG": ["sumbangan pibg", "pibg", "yuran pibg", "pibg_sumbangan"],
+                "Program Peningkatan": ["program peningkatan", "peningkatan", "akademik", "program peningkatan akademik", "peningkatan_akademik"],
+                "Keselamatan & Keceriaan": ["keselamatan", "keceriaan", "keselamatan keceriaan", "yuran keselamatan", "keselamatan_keceriaan"],
+                "ICT dan Komputer": ["ict", "komputer", "ict dan komputer", "makmal komputer", "ict_komputer"],
+                "Lain-lain": ["lain lain", "lainlain", "lain", "others", "lain_lain"]
+            };
+
+            for (let targetKey in mappings) {
+                standardized[targetKey] = "0.00"; // Default safe fallback
+            }
+
+            for (let originalKey in row) {
+                if (!originalKey) continue;
+                const cleanKey = originalKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+                let mapped = false;
+                
+                for (let targetKey in mappings) {
+                    const targetList = mappings[targetKey];
+                    const matchFound = targetList.some(val => {
+                        const cleanVal = val.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        return cleanKey === cleanVal || cleanKey.includes(cleanVal) || cleanVal.includes(cleanKey);
+                    });
+
+                    if (matchFound) {
+                        standardized[targetKey] = (row[originalKey] || "").trim();
+                        mapped = true;
+                        break;
+                    }
+                }
+                if (!mapped) {
+                    standardized[originalKey.trim()] = (row[originalKey] || "").trim();
+                }
+            }
+            return standardized;
+        }
+
+        function updateMappingStatus(firstRow) {
+            const area = document.getElementById('mappingStatusArea');
+            const badgesContainer = document.getElementById('mappingBadges');
+            if (!area || !badgesContainer) return;
+            
+            area.classList.remove('hidden');
+            badgesContainer.innerHTML = "";
+            
+            const keysToCheck = [
+                { key: "No. KP", label: "No. KP (Carian)" },
+                { key: "Nama Murid", label: "Nama Murid" },
+                { key: "No Resit", label: "No. Resit" },
+                { key: "Tarikh Transaksi", label: "Tarikh" },
+                { key: "Kelas", label: "Kelas" }
+            ];
+            
+            keysToCheck.forEach(item => {
+                const isFound = firstRow[item.key] !== undefined && firstRow[item.key] !== "0.00" && firstRow[item.key] !== "";
+                const badge = document.createElement('div');
+                badge.className = `flex items-center justify-between p-2 rounded-lg border ${
+                    isFound ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'
+                }`;
+                badge.innerHTML = `
+                    <span class="font-medium text-[11px]">${item.label}</span>
+                    <span class="flex items-center gap-1 font-bold text-[11px]">
+                        <i class="fas ${isFound ? 'fa-check-circle text-emerald-600' : 'fa-exclamation-triangle text-amber-600'}"></i>
+                        ${isFound ? 'OK' : 'Ralat'}
+                    </span>
+                `;
+                badgesContainer.appendChild(badge);
+            });
+        }
+
+        function fetchGoogleSheetData(url) {
+            Papa.parse(url, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        const cleanedData = results.data.map(row => standardizeHeaders(row));
+                        database = cleanedData;
+                        updateMappingStatus(cleanedData[0]);
+                        document.getElementById('statusBanner').classList.remove('hidden');
+                        showToast("Sambungan Google Sheets berjaya dikemaskini!", "success");
+                    } else {
+                        showToast("Gagal membaca baris data. Semak struktur lajur.", "error");
+                    }
+                },
+                error: function(err) {
+                    console.error("PapaParse Error:", err);
+                    showToast("Gagal memuat turun data dari Google Sheets.", "error");
+                }
+            });
+        }
+
+        function saveConfig() {
+            const urlInput = document.getElementById('sheetUrlInput').value.trim();
+            if (urlInput) {
+                localStorage.setItem('pibg_sheet_url', urlInput);
+                googleSheetUrl = urlInput;
+                fetchGoogleSheetData(urlInput);
+                closeConfigModal();
+            } else {
+                showToast("Sila masukkan pautan yang sah.", "warning");
+            }
+        }
+
+        function resetToMockData() {
+            localStorage.removeItem('pibg_sheet_url');
+            googleSheetUrl = DEFAULT_GOOGLE_SHEET_URL;
+            if (DEFAULT_GOOGLE_SHEET_URL) {
+                fetchGoogleSheetData(DEFAULT_GOOGLE_SHEET_URL);
+            } else {
+                database = [...MOCK_DATABASE];
+                document.getElementById('statusBanner').classList.add('hidden');
+                document.getElementById('mappingStatusArea').classList.add('hidden');
+                showToast("Kembali kepada Pangkalan Data Demo sekolah.", "info");
+            }
+            document.getElementById('sheetUrlInput').value = DEFAULT_GOOGLE_SHEET_URL;
+        }
+
+        function resetSheetToDefault() {
+            resetToMockData();
+            closeConfigModal();
+        }
+
+        function openPasswordModal() {
+            const modal = document.getElementById('passwordModal');
+            document.getElementById('adminPasswordInput').value = "";
+            document.getElementById('passwordError').classList.add('hidden');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+                modal.classList.add('opacity-100');
+                modal.querySelector('div').classList.add('scale-100');
+                document.getElementById('adminPasswordInput').focus();
+            }, 10);
+        }
+
+        function closePasswordModal() {
+            const modal = document.getElementById('passwordModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('opacity-100');
+                modal.querySelector('div').classList.remove('scale-100');
+            }, 300);
+        }
+
+        function verifyAdminPassword() {
+            const inputVal = document.getElementById('adminPasswordInput').value;
+            const errorText = document.getElementById('passwordError');
+
+            if (inputVal === ADMIN_PASSWORD) {
+                closePasswordModal();
+                openConfigModal();
+                showToast("Akses dibenarkan. Sila semak pautan Google Sheet.", "info");
+            } else {
+                errorText.classList.remove('hidden');
+                showToast("Kata laluan salah!", "error");
+            }
+        }
+
+        function openConfigModal() {
+            const modal = document.getElementById('configModal');
+            modal.classList.remove('hidden');
+            if (database && database.length > 0 && googleSheetUrl) {
+                updateMappingStatus(database[0]);
+            }
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+                modal.classList.add('opacity-100');
+                modal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeConfigModal() {
+            const modal = document.getElementById('configModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('opacity-100');
+                modal.querySelector('div').classList.remove('scale-100');
+            }, 300);
+        }
+
+        function normalizeString(str) {
+            return str ? str.toString().replace(/[-\s]/g, "").trim().toLowerCase() : "";
+        }
+
+        function navigateToPage(pageId) {
+            const searchView = document.getElementById('searchView');
+            const receiptView = document.getElementById('receiptView');
+
+            if (pageId === 'receipt') {
+                // Hide page 1, Show page 2
+                searchView.classList.add('hidden');
+                receiptView.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                // Hide page 2, Show page 1
+                receiptView.classList.add('hidden');
+                searchView.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function backToSearch() {
+            navigateToPage('search');
+            showToast("Kembali ke halaman carian.", "info");
+        }
+
+        function handleSearch(event) {
+            event.preventDefault();
+            const inputVal = document.getElementById('icInput').value.trim();
+            const normalizedInput = normalizeString(inputVal);
+
+            if (!normalizedInput) {
+                showToast("Sila masukkan Nombor Kad Pengenalan Murid", "warning");
+                return;
+            }
+
+            const record = database.find(item => {
+                const itemIC = normalizeString(item["No. KP"]);
+                return itemIC === normalizedInput;
+            });
+
+            const alertContainer = document.getElementById('alertContainer');
+
+            if (record) {
+                alertContainer.classList.add('hidden');
+                renderReceipt(record);
+                // Transition completely to Page 2
+                navigateToPage('receipt');
+                showToast("Rekod bayaran dijumpai! Memaparkan resit...", "success");
+            } else {
+                alertContainer.classList.remove('hidden');
+                document.getElementById('alertMessage').innerText = `Rekod bagi Kad Pengenalan "${inputVal}" tiada di dalam pangkalan data semasa.`;
+                showToast("Rekod carian tidak ditemui", "error");
+            }
+        }
+
+        function renderReceipt(data) {
+            document.getElementById('rNoResit').innerText = data["No Resit"] || "N/A";
+            document.getElementById('rTarikh').innerText = data["Tarikh Transaksi"] || "N/A";
+            document.getElementById('rNama').innerText = data["Nama Murid"] || "N/A";
+            document.getElementById('rKelas').innerText = data["Kelas"] || "N/A";
+            document.getElementById('rNoKP').innerText = data["No. KP"] || "N/A";
+
+            const now = new Date();
+            document.getElementById('rTimestamp').innerText = now.toLocaleString('ms-MY', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false 
+            });
+
+            const itemsTable = document.getElementById('receiptItemsTable');
+            itemsTable.innerHTML = ""; 
+
+            // Hardcode exactly the 5 requested categories to guarantee they always appear in the receipt
+            const contributionCategories = [
+                { name: "Sumbangan PIBG", key: "Sumbangan PIBG" },
+                { name: "Program Peningkatan", key: "Program Peningkatan" },
+                { name: "Keselamatan & Keceriaan", key: "Keselamatan & Keceriaan" },
+                { name: "ICT dan Komputer", key: "ICT dan Komputer" },
+                { name: "Lain-lain", key: "Lain-lain" }
+            ];
+
+            let rowCount = 1;
+            let grandTotal = 0;
+
+            contributionCategories.forEach(category => {
+                let rawVal = data[category.key];
+                let value = parseFloat(rawVal ? rawVal.toString().replace(/[^0-9.]/g, '') : "0");
+                
+                if (isNaN(value)) value = 0;
+                grandTotal += value;
+                
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                
+                // Show clean visual feedback badges based on status
+                const statusBadge = value > 0 
+                    ? `<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wide"><i class="fas fa-check-circle text-[10px]"></i> Selesai</span>`
+                    : `<span class="inline-flex items-center gap-1 bg-slate-100 text-slate-400 text-[10px] font-semibold px-2.5 py-0.5 rounded-full">-</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-2 text-center text-slate-400 font-bold text-[11px]">${rowCount}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800 text-[12px] uppercase tracking-wide">${category.name}</td>
+                    <td class="py-3 px-4 text-center">${statusBadge}</td>
+                    <td class="py-3 px-4 text-right font-bold text-slate-700 tracking-wide font-mono text-[13px]">RM ${value.toFixed(2)}</td>
+                `;
+                itemsTable.appendChild(tr);
+                rowCount++;
+            });
+
+            document.getElementById('rJumlah').innerText = `RM ${grandTotal.toFixed(2)}`;
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('receiptContainer');
+            const studentName = document.getElementById('rNama').innerText.replace(/\s+/g, '_');
+            const receiptNo = document.getElementById('rNoResit').innerText;
+
+            showToast("Menjana fail PDF beresolusi tinggi...", "info");
+
+            // Optimized Options to force single A4 document
+            const opt = {
+                margin:       0, // Use zero margin in generator, trust CSS padding
+                filename:     `Resit_PIBG_SK_Seri_Kelebang_${studentName}_${receiptNo}.pdf`,
+                image:        { type: 'jpeg', quality: 1.0 },
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).save().then(() => {
+                showToast("Muat turun PDF berjaya!", "success");
+            }).catch(err => {
+                console.error("PDF generation error: ", err);
+                showToast("Gagal memuat turun PDF. Cuba lagi.", "error");
+            });
+        }
+
+        function printReceipt() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

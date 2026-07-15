@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Carian Resit - PIBG SK Seri Kelebang, 31200 Chemor</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; min-height: 100vh; }
+        .receipt-wrapper { background: white; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-top: 8px solid #1e3a8a; }
+    </style>
+</head>
+<body class="py-10 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+
+    <div class="text-center max-w-2xl mx-auto mb-10">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2 tracking-tight">SISTEM CARIAN RESIT</h1>
+        <h2 class="text-xl sm:text-2xl font-semibold text-blue-700">PIBG SK SERI KELEBANG, 31200 CHEMOR</h2>
+    </div>
+
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-lg p-6 sm:p-8 mb-8 border border-gray-100">
+        <form id="searchForm" onsubmit="handleSearch(event)" class="space-y-4">
+            <div>
+                <label for="icInput" class="block text-sm font-medium text-gray-700 mb-1">Nombor Kad Pengenalan</label>
+                <input type="text" id="icInput" required class="block w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg" placeholder="Contoh: 890101125678">
+            </div>
+            <button type="submit" class="w-full py-3 px-4 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-xl transition-all">
+                <i class="fas fa-search mr-2"></i> Cari Resit
+            </button>
+        </form>
+    </div>
+
+    <div id="receiptContainer" class="w-full max-w-3xl hidden flex-col items-center">
+        <div class="w-full flex justify-end mb-4">
+            <button onclick="downloadPDF()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-md transition-all flex items-center">
+                <i class="fas fa-file-pdf mr-2 text-lg"></i> Muat Turun Resit (PDF)
+            </button>
+        </div>
+
+        <div id="receiptDocument" class="w-full bg-white border border-gray-200 shadow-sm p-4 sm:p-6 relative overflow-hidden">
+            
+            <!-- Header Resit Rasmi -->
+            <div class="flex flex-col sm:flex-row justify-between items-center border-b-2 border-gray-800 pb-3 mb-4 gap-4">
+                <div class="flex items-center gap-4 text-center sm:text-left">
+                    <div class="bg-blue-100 p-3 rounded-full flex-shrink-0 hidden sm:block">
+                        <i class="fas fa-school text-3xl text-blue-800"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">PIBG SK SERI KELEBANG</h2>
+                        <p class="text-xs text-gray-600 mt-0.5">31200 Chemor, Perak</p>
+                    </div>
+                </div>
+                <div class="text-center sm:text-right">
+                    <h1 class="text-2xl sm:text-3xl font-black text-blue-800 uppercase tracking-widest">Resit</h1>
+                    <p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-100 inline-block px-2 py-1 rounded mt-1">Rasmi PIBG</p>
+                </div>
+            </div>
+
+            <!-- Maklumat Pelajar & Resit -->
+            <div class="bg-gray-50/70 p-4 rounded-lg mb-4 border border-gray-200">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-sm">
+                    <div class="flex justify-between border-b border-gray-200 pb-1.5">
+                        <span class="font-semibold text-gray-500 uppercase text-xs">No. Resit</span>
+                        <span id="resitNo" class="font-bold text-gray-900 text-sm sm:text-base">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200 pb-1.5">
+                        <span class="font-semibold text-gray-500 uppercase text-xs">Tarikh Transaksi</span>
+                        <span id="resitTarikh" class="font-bold text-gray-900 text-sm sm:text-base">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200 pb-1.5 sm:col-span-2">
+                        <span class="font-semibold text-gray-500 uppercase text-xs">Nama Murid</span>
+                        <span id="resitNama" class="font-bold text-gray-900 text-sm sm:text-base uppercase text-right">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200 pb-1.5 sm:col-span-2">
+                        <span class="font-semibold text-gray-500 uppercase text-xs">Kelas</span>
+                        <span id="resitKelas" class="font-bold text-gray-900 text-sm sm:text-base text-right">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Jadual Amaun -->
+            <table class="w-full text-sm text-left text-gray-700 mb-4 border-collapse">
+                <thead class="text-xs text-gray-700 uppercase bg-blue-50/50">
+                    <tr>
+                        <th scope="col" class="px-3 py-2 border-b border-blue-100 rounded-tl-lg">Bil</th>
+                        <th scope="col" class="px-3 py-2 border-b border-blue-100">Perkara</th>
+                        <th scope="col" class="px-3 py-2 text-right border-b border-blue-100 rounded-tr-lg">Amaun (RM)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="px-3 py-2 text-gray-500">1</td><td class="px-3 py-2 font-medium text-gray-800">Sumbangan PIBG</td><td id="valPibg" class="px-3 py-2 text-right font-semibold">0.00</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">2</td><td class="px-3 py-2 font-medium text-gray-800">Program Peningkatan</td><td id="valPeningkatan" class="px-3 py-2 text-right font-semibold">0.00</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">3</td><td class="px-3 py-2 font-medium text-gray-800">Keselamatan & Keceriaan</td><td id="valKeselamatan" class="px-3 py-2 text-right font-semibold">0.00</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">4</td><td class="px-3 py-2 font-medium text-gray-800">ICT dan Komputer</td><td id="valIct" class="px-3 py-2 text-right font-semibold">0.00</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">5</td><td class="px-3 py-2 font-medium text-gray-800">Lain-lain</td><td id="valLain" class="px-3 py-2 text-right font-semibold">0.00</td></tr>
+                </tbody>
+                <tfoot>
+                    <tr class="border-t-2 border-gray-800 bg-gray-50">
+                        <td colspan="2" class="px-3 py-3 text-right font-bold text-gray-900 uppercase tracking-wider text-xs sm:text-sm">Jumlah Keseluruhan</td>
+                        <td id="valJumlah" class="px-3 py-3 text-right font-black text-blue-800 text-base sm:text-lg">RM 0.00</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <!-- Nota Kaki (Footer) -->
+            <div class="mt-5 pt-3 border-t border-dashed border-gray-300 text-center">
+                <p class="text-[10px] sm:text-xs text-gray-500 italic mb-0.5">Resit ini adalah janaan komputer dan sah tanpa tandatangan fizikal.</p>
+                <p class="text-[10px] sm:text-xs font-semibold text-gray-400">Terima kasih atas sumbangan anda kepada PIBG SK Seri Kelebang.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQMazQZEOgqlF7tMs0myh_SWUbbcysPjgEVZNx0aPxtzma6fhccnacl8f3gsO4ssMldkKtYcRtMYqUH/pub?output=csv";
+        let sheetData = [];
+
+        Papa.parse(CSV_URL, { 
+            download: true, 
+            header: true,
+            skipEmptyLines: true,
+            complete: (res) => { sheetData = res.data; } 
+        });
+
+        function handleSearch(e) {
+            e.preventDefault();
+            const ic = document.getElementById('icInput').value.replace(/\D/g, ''); // Buang semua huruf/sengkang
+            
+            if (sheetData.length === 0) {
+                Swal.fire('Sabar', 'Sistem sedang memuat turun data. Sila cuba klik lagi sekali.', 'info');
+                return;
+            }
+
+            // Cari mana-mana baris di mana mana-mana sel mengandungi No IC ini
+            const record = sheetData.find(r => Object.values(r).some(v => v !== null && v !== undefined && v.toString().replace(/\D/g, '') === ic));
+            
+            if (record) {
+                renderReceipt(record);
+            } else {
+                Swal.fire('Tidak Dijumpai', 'Tiada resit untuk kad pengenalan ini. Sila semak semula nombor.', 'warning');
+            }
+        }
+
+        function getField(data, keywords) {
+            const keys = Object.keys(data);
+            for (let word of keywords) {
+                const foundKey = keys.find(k => k.trim().toLowerCase().includes(word.toLowerCase()));
+                if (foundKey && data[foundKey]) return data[foundKey];
+            }
+            return null;
+        }
+
+        function renderReceipt(data) {
+            // Memadankan lajur Google Sheet menggunakan carian kata kunci
+            document.getElementById('resitNo').innerText = getField(data, ['no resit', 'resit']) || '-';
+            document.getElementById('resitTarikh').innerText = getField(data, ['tarikh transaksi', 'tarikh', 'date']) || '-';
+            document.getElementById('resitNama').innerText = getField(data, ['nama murid', 'nama']) || '-';
+            document.getElementById('resitKelas').innerText = getField(data, ['kelas', 'tingkatan', 'tahun']) || '-';
+            
+            // Fungsi membersihkan nilai wang (buang RM, huruf, dll)
+            const parseMoney = (val) => {
+                if (!val) return 0;
+                const num = parseFloat(val.toString().replace(/[^\d.-]/g, ''));
+                return isNaN(num) ? 0 : num;
+            };
+
+            const pibg = parseMoney(getField(data, ['sumbangan pibg', 'pibg']));
+            const peningkatan = parseMoney(getField(data, ['program peningkatan', 'peningkatan']));
+            const keselamatan = parseMoney(getField(data, ['keselamatan', 'keceriaan']));
+            const ict = parseMoney(getField(data, ['ict dan komputer', 'ict', 'komputer']));
+            const lain = parseMoney(getField(data, ['lain']));
+
+            document.getElementById('valPibg').innerText = pibg.toFixed(2);
+            document.getElementById('valPeningkatan').innerText = peningkatan.toFixed(2);
+            document.getElementById('valKeselamatan').innerText = keselamatan.toFixed(2);
+            document.getElementById('valIct').innerText = ict.toFixed(2);
+            document.getElementById('valLain').innerText = lain.toFixed(2);
+            
+            const total = pibg + peningkatan + keselamatan + ict + lain;
+            document.getElementById('valJumlah').innerText = 'RM ' + total.toFixed(2);
+            
+            document.getElementById('receiptContainer').classList.remove('hidden');
+            document.getElementById('receiptContainer').classList.add('flex');
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('receiptDocument');
+            const namaMurid = document.getElementById('resitNama').innerText.trim() || 'Pelajar';
+            const resitNo = document.getElementById('resitNo').innerText.trim() || 'Semakan';
+            
+            // Format fail diselaraskan dengan nama dan no resit pelajar
+            const safeNama = namaMurid.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, '_');
+            const fileName = `Resit_PIBG_${safeNama}_${resitNo}.pdf`;
+
+            // Simpan tetapan asal paparan
+            const originalWidth = element.style.width;
+            const originalMaxWidth = element.style.maxWidth;
+            const originalHeight = element.style.height;
+            const originalPadding = element.style.padding;
+            
+            // --- KUNCI PENYELESAIAN 1 MUKA SURAT ---
+            // Kita memanipulasi saiz elemen supaya ia ngam-ngam mengikut nisbah 
+            // kelebaran kertas standard A4 (794px). Ini mengelakkan imej melimpah.
+            element.style.width = '794px'; 
+            element.style.maxWidth = '794px';
+            element.style.height = 'max-content'; // Pastikan ia tidak meleret ke bawah
+            element.style.padding = '40px'; // Ruang putih / border luar dimasukkan dalam HTML terus
+            // ----------------------------------------
+
+            // Tetapan cetakan berkualiti tinggi PDF (Kertas A4 Potret)
+            const opt = {
+                margin:       0, // Margin mesti 0 kerana kita dah guna padding HTML
+                filename:     fileName,
+                image:        { type: 'jpeg', quality: 1.0 },
+                html2canvas:  { 
+                    scale: 2, 
+                    useCORS: true,
+                    windowWidth: 794,
+                    scrollY: 0
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: 'avoid-all' } // HALANG sistem dari membelah muka surat
+            };
+
+            // Menunjukkan amaran memuat turun
+            Swal.fire({
+                title: 'Menjana Dokumen...',
+                text: 'Sila tunggu sebentar, resit A4 sedang disediakan.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Laksanakan proses muat turun
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Kembalikan gaya saiz asal selepas berjaya supaya kembali cantik di telefon
+                element.style.width = originalWidth;
+                element.style.maxWidth = originalMaxWidth;
+                element.style.height = originalHeight;
+                element.style.padding = originalPadding;
+                Swal.close();
+            }).catch(err => {
+                // Kembalikan gaya saiz asal jika terdapat error
+                element.style.width = originalWidth;
+                element.style.maxWidth = originalMaxWidth;
+                element.style.height = originalHeight;
+                element.style.padding = originalPadding;
+                Swal.fire('Ralat', 'Gagal memuat turun resit.', 'error');
+            });
+        }
+    </script>
+</body>
+</html>
